@@ -9,11 +9,16 @@ class CarspiderSpider(scrapy.Spider):
     name = "carspider"
 
     allowed_domains = ["autotrader.com"]
-    #start_urls = ["https://www.autotrader.com"]
-    #start_urls = ["https://www.autotrader.com/cars-for-sale/all-cars/cars-between-10000-and-16500/honda/hr-v/austin-tx?newSearch=true&zip=78745"]
-    #start_urls = ["https://www.autotrader.com/cars-for-sale/honda/civic/austin-tx?newSearch=false&numRecords=100&zip=78745"]
-    #start_urls = ["https://www.autotrader.com/cars-for-sale/honda/civic/austin-tx?newSearch=true&zip=78745"]
-    start_urls = ["https://www.autotrader.com/cars-for-sale/cars-between-10000-and-16500/honda/austin-tx?modelCode=CIVIC&modelCode=HONHRV&modelCode=ACCORD&newSearch=true&numRecords=100&zip=78745"]
+    start_urls = [ 
+        "https://www.autotrader.com/cars-for-sale/cars-between-10000-and-16500/honda/austin-tx?modelCode=CIVIC&modelCode=HONHRV&modelCode=ACCORD&newSearch=true&numRecords=100&zip=78745",
+        "https://www.autotrader.com/cars-for-sale/cars-between-10000-and-16500/toyota/austin-tx?modelCode=COROL&modelCode=YARIS&modelCode=CAMRY&modelCode=PRIUS&modelCode=PRIUSC&newSearch=true&zip=78745",
+        "https://www.autotrader.com/cars-for-sale/all-cars/cars-between-10000-and-16500/mazda/austin-tx?modelCode=MAZDA3&modelCode=CX-5&newSearch=true&zip=78745",
+        "https://www.autotrader.com/cars-for-sale/cars-between-10000-and-16500/subaru/austin-tx?modelCode=IMPREZ&modelCode=SUBCRSSTRK&newSearch=true&zip=78745",
+        "https://www.autotrader.com/cars-for-sale/cars-between-10000-and-16500/nissan/kicks/austin-tx?newSearch=true&zip=78745",
+    ]
+    df = pd.DataFrame(columns=['vin', 'year', 'make', 'model', 'price', 'exterior', 'interior', 'miles', 'url', 'dealer', 'phone', 'address', 'zipcode'])
+    df.to_csv('cars.csv', index=False)
+
     def parse(self, response):
         filename = "honda-civics.html"
         #filename = "honda-hrvs.html"
@@ -44,7 +49,7 @@ class CarspiderSpider(scrapy.Spider):
         data = [vin, year, make, model, price, exterior, interior, miles, url, dealer, phone, address, zipcode]
         #print(np.transpose(data))
         df = pd.DataFrame(np.transpose(data), columns=['vin', 'year', 'make', 'model', 'price', 'exterior', 'interior', 'miles', 'url', 'dealer', 'phone', 'address', 'zipcode'])
-        df.to_csv('out.csv', index=False)
+        df.to_csv('cars.csv', mode='a', index=False, header=False)
 
 #data = json.loads(response.xpath('//script[@data-cmp="listingsCollectionSchema"]//text()').get())
 #data['about']['offers']['itemOffered'][0]
