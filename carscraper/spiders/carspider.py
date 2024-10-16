@@ -1,4 +1,7 @@
 from pathlib import Path
+import os
+import shutil
+from datetime import datetime
 import pandas as pd
 import numpy as np
 import json
@@ -15,9 +18,20 @@ class CarspiderSpider(scrapy.Spider):
         "https://www.autotrader.com/cars-for-sale/all-cars/cars-between-10000-and-16500/mazda/austin-tx?modelCode=MAZDA3&modelCode=CX-5&newSearch=true&zip=78745",
         "https://www.autotrader.com/cars-for-sale/cars-between-10000-and-16500/subaru/austin-tx?modelCode=IMPREZ&modelCode=SUBCRSSTRK&newSearch=true&zip=78745",
         "https://www.autotrader.com/cars-for-sale/cars-between-10000-and-16500/nissan/kicks/austin-tx?newSearch=true&zip=78745",
+        "https://www.autotrader.com/cars-for-sale/all-cars/cars-between-10000-and-16500/hyundai/austin-tx?modelCode=HYUKONA&modelCode=HYUNDKONAN&newSearch=true&zip=78745",
     ]
-    df = pd.DataFrame(columns=['vin', 'year', 'make', 'model', 'price', 'exterior', 'interior', 'miles', 'url', 'dealer', 'phone', 'address', 'zipcode'])
-    df.to_csv('cars.csv', index=False)
+
+    filename = 'cars.csv'
+
+    if os.path.exists(filename):
+        # Make a backup of cars.csv
+        shutil.copy2(filename, filename.replace('.', '_old.'))
+        df = pd.read_csv(filename)
+    else:
+        # Create empty dataframe and read to file
+        df = pd.DataFrame(columns=['vin', 'year', 'make', 'model', 'price', 'exterior', 'interior', 'miles', 'url', 'dealer', 'phone', 'address', 'zipcode', 'is_new'])
+        df.to_csv('cars.csv', index=False)
+    
 
     def parse(self, response):
         filename = "honda-civics.html"
@@ -29,27 +43,40 @@ class CarspiderSpider(scrapy.Spider):
         print(items[0])
         item_count = len(items)
         vin, year, make, model, price, exterior, interior, miles, url, dealer, phone = [], [], [], [], [], [], [], [], [], [], []
-        zipcode, address = [], []
+        zipcode, address, is_new = [], [], []
         for i in list(range(item_count)):
             item = items[i]
-            vin.append(item['vehicleIdentificationNumber'])
-            year.append(item['vehicleModelDate'])
-            make.append(item['brand']['name'])
-            model.append(item['model'])
-            price.append(item['offers']['price'])
-            exterior.append(item['color'])
-            interior.append(item['vehicleInteriorColor'])
-            miles.append(item['mileageFromOdometer']['value'])
-            url.append(item['url'])
-            dealer.append(item['offers']['seller']['name'])
-            phone.append(item['offers']['seller']['telephone'])
-            address.append(item['offers']['seller']['address']['streetAddress'])
-            zipcode.append(item['offers']['seller']['address']['postalCode'])
-            print(items[i]['vehicleIdentificationNumber'])
-        data = [vin, year, make, model, price, exterior, interior, miles, url, dealer, phone, address, zipcode]
+            vin_this = item['vehicleIdentificationNumber']
+            print(vin_this)
+            price_this = item['offers']['price']
+            idx = self.df.loc[self.df['vin'] == vin_this].index.tolist()
+            if len(idx) == 0:
+                # New car
+                print("New Car")
+                vin.append(item['vehicleIdentificationNumber'])
+                year.append(item['vehicleModelDate'])
+                make.append(item['brand']['name'])
+                model.append(item['model'])
+                price.append(item['offers']['price'])
+                exterior.append(item['color'])
+                interior.append(item['vehicleInteriorColor'])
+                miles.append(item['mileageFromOdometer']['value'])
+                url.append(item['url'])
+                dealer.append(item['offers']['seller']['name'])
+                phone.append(item['offers']['seller']['telephone'])
+                address.append(item['offers']['seller']['address']['streetAddress'])
+                zipcode.append(item['offers']['seller']['address']['postalCode'])
+                is_new.append(datetime.now().strftime('%Y%m%d_%H:%M:%S'))
+            else:
+                # Car is in the list, see if the price has changed
+                old_price = self.df.loc[idx[0], 'price']
+                if not float(price_this) == float(old_price):
+                    print('Old price: {}, New price: {}'.format(old_price, price_this))
+                    self.df.loc[idx[0], 'price'] = price_this
+        data = [vin, year, make, model, price, exterior, interior, miles, url, dealer, phone, address, zipcode, is_new]
         #print(np.transpose(data))
-        df = pd.DataFrame(np.transpose(data), columns=['vin', 'year', 'make', 'model', 'price', 'exterior', 'interior', 'miles', 'url', 'dealer', 'phone', 'address', 'zipcode'])
-        df.to_csv('cars.csv', mode='a', index=False, header=False)
+        df_this = pd.DataFrame(np.transpose(data), columns=['vin', 'year', 'make', 'model', 'price', 'exterior', 'interior', 'miles', 'url', 'dealer', 'phone', 'address', 'zipcode', 'is_new'])
+        df_this.to_csv(self.filename, mode='a', index=False, header=False)
 
 #data = json.loads(response.xpath('//script[@data-cmp="listingsCollectionSchema"]//text()').get())
 #data['about']['offers']['itemOffered'][0]
