@@ -11,17 +11,30 @@ import scrapy
 class CarspiderSpider(scrapy.Spider):
     name = "carspider"
 
-    allowed_domains = ["autotrader.com"]
-    start_urls = [ 
-        "https://www.autotrader.com/cars-for-sale/cars-between-10000-and-16500/honda/austin-tx?modelCode=CIVIC&modelCode=HONHRV&modelCode=ACCORD&newSearch=true&numRecords=100&zip=78745",
-        "https://www.autotrader.com/cars-for-sale/cars-between-10000-and-16500/toyota/austin-tx?modelCode=COROL&modelCode=YARIS&modelCode=CAMRY&modelCode=PRIUS&modelCode=PRIUSC&newSearch=true&zip=78745",
-        "https://www.autotrader.com/cars-for-sale/all-cars/cars-between-10000-and-16500/mazda/austin-tx?modelCode=MAZDA3&modelCode=CX-5&newSearch=true&zip=78745",
-        "https://www.autotrader.com/cars-for-sale/cars-between-10000-and-16500/subaru/austin-tx?modelCode=IMPREZ&modelCode=SUBCRSSTRK&newSearch=true&zip=78745",
-        "https://www.autotrader.com/cars-for-sale/cars-between-10000-and-16500/nissan/kicks/austin-tx?newSearch=true&zip=78745",
-        "https://www.autotrader.com/cars-for-sale/all-cars/cars-between-10000-and-16500/hyundai/austin-tx?modelCode=HYUKONA&modelCode=HYUNDKONAN&newSearch=true&zip=78745",
-    ]
+    zipcode = 78745
+    max_miles = 100000
+    min_price_dollars = 10000
+    max_price_dollars = 16000
 
-    filename = 'cars.csv'
+    make_model = {'honda': ['HONHRV', 'ACCORD'], 'toyota': ['COROL', 'CAMRY', 'YARIS', 'PRIUS', 'PRIUSC'],
+                'mazda': ['MAZDA3', 'CX-5', 'MAZCX30'], 'subaru': ['IMPREZ', 'SUBCRSSTRK'], 
+                'nissan': ['NISKICKS', 'ROGUE', 'NISROGSPT'], 'hyundai': ['HYUKONA', 'HYUNDKONAN']}
+
+    allowed_domains = ["autotrader.com"]
+
+    base_url = "https://www.autotrader.com/cars-for-sale/cars-between-{}-and-{}".format(min_price_dollars, max_price_dollars)
+    start_urls = []
+    makes = make_model.keys()
+    for m in makes:
+        url_this = "{}/{}/austin-tx?mileage={}".format(base_url, m, max_miles) 
+        for j in range(len(make_model[m])):
+            url_this += "&modelCode={}".format(make_model[m][j])
+        url_this += "&newSearch=true&numRecords=100&zip={}".format(zipcode)
+        start_urls.append(url_this)
+
+    #print(start_urls)
+    #exit(0)
+    filename = 'cars_{}_{}k_mi_${}k_${}k.csv'.format(zipcode, int(max_miles/1000), int(min_price_dollars), int(max_price_dollars))
 
     if os.path.exists(filename):
         # Make a backup of cars.csv
@@ -30,7 +43,7 @@ class CarspiderSpider(scrapy.Spider):
     else:
         # Create empty dataframe and read to file
         df = pd.DataFrame(columns=['vin', 'year', 'make', 'model', 'price', 'exterior', 'interior', 'miles', 'url', 'dealer', 'phone', 'address', 'zipcode', 'is_new'])
-        df.to_csv('cars.csv', index=False)
+        df.to_csv(filename, index=False)
     
 
     def parse(self, response):
@@ -52,7 +65,6 @@ class CarspiderSpider(scrapy.Spider):
             idx = self.df.loc[self.df['vin'] == vin_this].index.tolist()
             if len(idx) == 0:
                 # New car
-                print("New Car")
                 vin.append(item['vehicleIdentificationNumber'])
                 year.append(item['vehicleModelDate'])
                 make.append(item['brand']['name'])
@@ -67,12 +79,14 @@ class CarspiderSpider(scrapy.Spider):
                 address.append(item['offers']['seller']['address']['streetAddress'])
                 zipcode.append(item['offers']['seller']['address']['postalCode'])
                 is_new.append(datetime.now().strftime('%Y%m%d_%H:%M:%S'))
+                row = len(vin) - 1
+                print("New Car: {} {} {} {} miles ${}".format(year[row], make[row], model[row], miles[row], price[row]))
             else:
                 # Car is in the list, see if the price has changed
                 old_price = self.df.loc[idx[0], 'price']
                 if not float(price_this) == float(old_price):
                     print('Old price: {}, New price: {}'.format(old_price, price_this))
-                    self.df.loc[idx[0], 'price'] = price_this
+                    self.df.loc[idx[0], 'price'] = float(price_this)
         data = [vin, year, make, model, price, exterior, interior, miles, url, dealer, phone, address, zipcode, is_new]
         #print(np.transpose(data))
         df_this = pd.DataFrame(np.transpose(data), columns=['vin', 'year', 'make', 'model', 'price', 'exterior', 'interior', 'miles', 'url', 'dealer', 'phone', 'address', 'zipcode', 'is_new'])
